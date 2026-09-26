@@ -10,6 +10,14 @@ import { Preloader } from "./components/Preloader";
 import { CaseStudy } from "./components/CaseStudy";
 import { WORKS, CHAPTERS, DISCIPLINES } from "./data";
 import { reducedMotion } from "./pointer";
+import { sound } from "./sound";
+
+// How much light each station holds: the score is muffled in the dark ones.
+const BRIGHT = [0, 1, 1, 1, 1, 1, 0.85, 0];
+const brightnessAt = (p: number) => {
+  const i = Math.min(Math.floor(p), BRIGHT.length - 2), t = p - i;
+  return BRIGHT[i] + (BRIGHT[i + 1] - BRIGHT[i]) * t;
+};
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -34,6 +42,8 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [chapter, setChapter] = useState(0);
   const [disc, setDisc] = useState(0);
+  const [soundOn, setSoundOn] = useState(sound.enabled);
+  useEffect(() => { sound.onChange(setSoundOn); }, []);
   const [slug, setSlug] = useState<string | null>(null);
 
   // ── world + smooth scroll + scroll→station mapping
@@ -84,6 +94,7 @@ export default function App() {
           }
       }
       w.setProgress(p);
+      if (!current.current) sound.setBrightness(brightnessAt(p));
       const dt = Math.min(1, Math.max(0, (y - discBox.top) / discBox.len));
       w.setDiscipline(dt * 5 - 0.5);
       const di = Math.min(4, Math.floor(dt * 5));
@@ -182,6 +193,8 @@ export default function App() {
           lenis.current?.scrollTo(y, { immediate: true, force: true });
         }
         world.current?.setFocus(w ? w.station : null);
+        sound.setDucked(!!w);
+        if (w) sound.setBrightness(BRIGHT[w.station]);
         if (next) lenis.current?.stop();
         else lenis.current?.start();
         if (push) history.pushState(null, "", next ? `#/work/${next}` : location.pathname + location.search);
@@ -235,9 +248,22 @@ export default function App() {
         <div className="hud-chapter meta" aria-live="polite">
           <span key={chapter} className="roll">{CHAPTERS[chapter]}</span>
         </div>
-        <Magnetic>
-          <button className="hud-link meta" onClick={() => scrollTo("#contact")}>Contact</button>
-        </Magnetic>
+        <div className="hud-right">
+          <Magnetic>
+            <button
+              className={`hud-link sound${soundOn ? " is-on" : ""}`}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => sound.toggle()}
+              aria-pressed={soundOn}
+            >
+              <span className="bars" aria-hidden><i /><i /><i /></span>
+              {soundOn ? "Sound on" : "Sound off"}
+            </button>
+          </Magnetic>
+          <Magnetic>
+            <button className="hud-link meta" onClick={() => scrollTo("#contact")}>Contact</button>
+          </Magnetic>
+        </div>
         <div className="hud-bottom meta">
           <span>TC <span ref={tc}>00:00:00:00</span></span>
           <span className="hud-bar"><span ref={bar} /></span>
