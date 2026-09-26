@@ -87,6 +87,10 @@ html.has-cursor, html.has-cursor * { cursor: none !important; }
 .pl-meta { position: absolute; font-family: var(--serif); font-style: italic; font-size: 22px; color: #a8a8a8; }
 .pl-tl { top: 22px; left: var(--gutter); font-family: var(--display); font-style: normal; font-weight: 800; font-size: 20px; letter-spacing: 0.08em; color: #fff; }
 .pl-bl { bottom: 24px; left: var(--gutter); }
+.pl-enter { position: absolute; left: 50%; transform: translateX(-50%); display: none; gap: 34px; pointer-events: auto; white-space: nowrap; }
+.pl-enter button { font-family: var(--serif); font-style: italic; font-size: clamp(18px, 2vw, 24px); color: #f3f3f1; border-bottom: 1px solid rgba(243, 243, 241, 0.35); padding: 4px 2px; transition: border-color 0.3s; }
+.pl-enter button:hover { border-color: #f3f3f1; }
+.pl-enter button + button { color: #8d8d8d; }
 .veil { position: fixed; inset: 0; z-index: 60; background: var(--paper); color: #0c0c0e; display: none; align-items: center; justify-content: center; font-family: var(--serif); font-style: italic; font-size: 28px; }
 
 /* ─────────────────────────── sections */

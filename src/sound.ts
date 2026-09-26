@@ -6,6 +6,7 @@
  */
 const TRACK = "/audio/the-weight-of-granite.mp3";
 const KEY = "aetherius:sound";
+const VOICES = ["threshold", "manifesto", "wanderer", "ascension", "legion", "collision", "disciplines", "exit"];
 
 class Sound {
   private ctx: AudioContext | null = null;
@@ -16,6 +17,9 @@ class Sound {
   private duck = 1;
   enabled: boolean;
   private listeners = new Set<(on: boolean) => void>();
+  private voiceGain!: GainNode;
+  private buffers = new Map<string, AudioBuffer>();
+  private speaking = false;
 
   constructor() {
     let saved: string | null = null;
@@ -42,11 +46,49 @@ class Sound {
       this.gain.gain.value = 0;
       this.ctx.createMediaElementSource(this.el).connect(this.tone).connect(this.gain).connect(this.ctx.destination);
       this.applyBrightness(true);
+      this.voiceGain = this.ctx.createGain();
+      this.voiceGain.gain.value = 0.95;
+      this.voiceGain.connect(this.ctx.destination);
+      // the narrator's lines are tiny: fetch them all once
+      const ctx = this.ctx;
+      VOICES.forEach((v) =>
+        fetch(`/audio/voice/${v}.mp3`).then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b))
+          .then((buf) => this.buffers.set(v, buf)).catch(() => {}),
+      );
     }
     this.ctx.resume();
     this.el!.play().catch(() => {});
     this.gain.gain.cancelScheduledValues(this.ctx.currentTime);
-    this.gain.gain.setTargetAtTime(0.75 * this.duck, this.ctx.currentTime, 1.4);
+    this.gain.gain.setTargetAtTime(this.level(), this.ctx.currentTime, 1.4);
+  }
+
+  private level() {
+    return 0.75 * this.duck * (this.speaking ? 0.4 : 1);
+  }
+
+  /** Explicit choice (the "enter" gate): must be called from a click. */
+  setEnabled(on: boolean) {
+    this.enabled = on;
+    try { localStorage.setItem(KEY, on ? "on" : "off"); } catch { /* ignore */ }
+    if (on) this.start(); else this.stop();
+    this.listeners.forEach((f) => f(on));
+  }
+
+  /** The narrator names the room you just walked into. The score steps back while she speaks. */
+  say(name: string) {
+    if (!this.ctx || !this.enabled) return;
+    const buf = this.buffers.get(name);
+    if (!buf) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(this.voiceGain);
+    this.speaking = true;
+    this.gain.gain.setTargetAtTime(this.level(), this.ctx.currentTime, 0.15);
+    src.onended = () => {
+      this.speaking = false;
+      if (this.ctx && this.enabled) this.gain.gain.setTargetAtTime(this.level(), this.ctx.currentTime, 0.8);
+    };
+    src.start();
   }
 
   private stop() {
@@ -57,10 +99,7 @@ class Sound {
   }
 
   toggle() {
-    this.enabled = !this.enabled;
-    try { localStorage.setItem(KEY, this.enabled ? "on" : "off"); } catch { /* ignore */ }
-    if (this.enabled) this.start(); else this.stop();
-    this.listeners.forEach((f) => f(this.enabled));
+    this.setEnabled(!this.enabled);
   }
 
   onChange(f: (on: boolean) => void) {
@@ -78,7 +117,7 @@ class Sound {
   /** Case studies: the score steps back so the page can be read. */
   setDucked(d: boolean) {
     this.duck = d ? 0.45 : 1;
-    if (this.ctx && this.enabled) this.gain.gain.setTargetAtTime(0.75 * this.duck, this.ctx.currentTime, 0.6);
+    if (this.ctx && this.enabled) this.gain.gain.setTargetAtTime(this.level(), this.ctx.currentTime, 0.6);
   }
 
   private applyBrightness(now = false) {

@@ -14,6 +14,7 @@ import { sound } from "./sound";
 
 // How much light each station holds: the score is muffled in the dark ones.
 const BRIGHT = [0, 1, 1, 1, 1, 1, 0.85, 0];
+const VOICE = ["threshold", "manifesto", "wanderer", "ascension", "legion", "collision", "disciplines", "exit"];
 const brightnessAt = (p: number) => {
   const i = Math.min(Math.floor(p), BRIGHT.length - 2), t = p - i;
   return BRIGHT[i] + (BRIGHT[i + 1] - BRIGHT[i]) * t;
@@ -44,7 +45,21 @@ export default function App() {
   const [disc, setDisc] = useState(0);
   const [soundOn, setSoundOn] = useState(sound.enabled);
   useEffect(() => { sound.onChange(setSoundOn); }, []);
+
   const [slug, setSlug] = useState<string | null>(null);
+
+  // Announce a chapter once the visitor has settled in it (not while flying past).
+  const lastSaid = useRef<{ ch: number; t: number }>({ ch: -1, t: 0 });
+  useEffect(() => {
+    if (!loaded || slug) return;
+    const id = window.setTimeout(() => {
+      const now = performance.now();
+      if (lastSaid.current.ch === chapter && now - lastSaid.current.t < 15000) return;
+      lastSaid.current = { ch: chapter, t: now };
+      sound.say(VOICE[chapter]);
+    }, 650);
+    return () => window.clearTimeout(id);
+  }, [chapter, loaded, slug]);
 
   // ── world + smooth scroll + scroll→station mapping
   useEffect(() => {
@@ -238,7 +253,7 @@ export default function App() {
   return (
     <>
       <canvas ref={canvas} className="world" aria-hidden />
-      <Preloader onDone={onLoaded} portal={portalRect} />
+      <Preloader onDone={onLoaded} portal={portalRect} onChoose={(withSound) => sound.setEnabled(withSound)} />
 
       {/* Everything typographic lives in one difference-blended layer: white on ink, ink on light. */}
       <header className="hud">
